@@ -7,9 +7,10 @@
   gather_facts: False
   vars:
     instance_type: t2.micro
-    security_group: default
-    image: ami-db7b39e1
+    security_group: splunk
+    image: ami-48d38c2b
     vpc_subnet_id: subnet-7f67b91a
+    key_name: GoogleCloudShell
   tasks:
   - name: Launch instance
     ec2:
@@ -18,8 +19,37 @@
       image: "{{ image }}"
       wait: true
       vpc_subnet_id: "{{ vpc_subnet_id }}"
+      key_name: "{{ key_name }}"
       assign_public_ip: yes
     register: ec2
+  - name: Add new instance to host group
+    local_action: add_host hostname={{ item.public_ip }} groupname=launched
+    with_items: ec2.instances
+  - name: Wait for SSH to come up
+    local_action: wait_for host={{ item.public_dns_name }} port=22 delay=60 timeout=320 state=started
+    with_items: ec2.instances
+  - name: Add to known hosts
+    local_action: command sh -c 'ssh-keyscan -t rsa {{ item.public_ip }} >>$HOME/.ssh/known_hosts'
+    with_items: ec2.instances
+
+- name: Install Splunk
+  hosts: launched
+  remote_user: ec2-user
+  sudo: yes
+  gather_facts: False
+  vars:
+    splunk_src: /home/cwegener/splunk-6.3.1-f3e41e4b37b2-linux-2.6-x86_64.rpm
+  tasks:
+  - name: Copy Splunk binary
+    copy: src={{ splunk_src }} dest=/tmp/splunk.rpm
+  - name: Install Splunk RPM
+    yum: name=/tmp/splunk.rpm state=present
+  - name: Create Splunk Init script
+    command: /opt/splunk/bin/splunk enable boot-start -user splunk --accept-license
+    args:
+      creates: /etc/init.d/splunk
+  - name: Start Splunk
+    service: name=splunk state=started
 
 
 # vim:ft=ansible:
