@@ -38,7 +38,7 @@
   sudo: yes
   gather_facts: False
   vars:
-    splunk_src: /home/cwegener/splunk-6.3.1-f3e41e4b37b2-linux-2.6-x86_64.rpm
+    splunk_src: "{{ lookup('env','HOME') }}/splunk-6.3.1-f3e41e4b37b2-linux-2.6-x86_64.rpm"
   tasks:
   - name: Copy Splunk binary
     copy: src={{ splunk_src }} dest=/tmp/splunk.rpm
